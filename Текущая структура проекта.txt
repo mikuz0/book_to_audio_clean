@@ -1,0 +1,21 @@
+book_to_audio/
+├── main.py
+├── requirements.txt
+├── run.sh
+├── activate_env.sh
+├── config.json
+├── core/
+│   ├── __init__.py
+│   ├── config_manager.py
+│   ├── text_extractor.py
+│   ├── text_processor.py
+│   ├── stress_dict.py
+│   └── audio_generator.py
+├── gui/
+│   ├── __init__.py
+│   ├── main_window.py
+│   ├── accent_editor.py
+│   └── params_dialog.py
+└── utils/
+    ├── __init__.py
+    └── file_utils.py
