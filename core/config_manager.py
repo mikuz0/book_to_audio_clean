@@ -28,7 +28,12 @@ class ConfigManager:
             "top_k": 50,
             "top_p": 0.85,
             "gpt_cond_len": 12,
-            "sound_norm_refs": True
+            "sound_norm_refs": True,
+            # Параметры разбиения текста
+            "split_min_length": 50,
+            "split_max_length": 300,
+            "split_primary_delimiters": ".!?",
+            "split_secondary_delimiters": ":;,"
         }
         self.load()
     

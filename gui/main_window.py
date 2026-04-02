@@ -16,6 +16,7 @@ from core.text_processor import TextProcessor
 from core.audio_generator import AudioGenerator
 from gui.accent_editor import AccentEditor
 from gui.params_dialog import ParamsDialog
+from gui.split_params_dialog import SplitParamsDialog
 
 
 class MainWindow:
@@ -154,18 +155,22 @@ class MainWindow:
         ttk.Label(settings_frame, text="Параметры синтеза:").grid(row=9, column=0, sticky=tk.W, padx=5)
         ttk.Button(settings_frame, text="⚙ Настройки", command=self.open_synth_params).grid(row=9, column=1, sticky=tk.W, padx=5)
         
-        ttk.Separator(settings_frame, orient='horizontal').grid(row=10, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        # Кнопка параметров разбиения
+        ttk.Label(settings_frame, text="Разбиение текста:").grid(row=10, column=0, sticky=tk.W, padx=5)
+        ttk.Button(settings_frame, text="✂ Настройки разбиения", command=self.open_split_params).grid(row=10, column=1, sticky=tk.W, padx=5)
+        
+        ttk.Separator(settings_frame, orient='horizontal').grid(row=11, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
         
         # === Настройки словаря ===
-        ttk.Label(settings_frame, text="Словарь исправлений:", font=('TkDefaultFont', 10, 'bold')).grid(row=11, column=0, columnspan=3, sticky=tk.W, pady=(5,10))
+        ttk.Label(settings_frame, text="Словарь исправлений:", font=('TkDefaultFont', 10, 'bold')).grid(row=12, column=0, columnspan=3, sticky=tk.W, pady=(5,10))
         
         dict_frame = ttk.Frame(settings_frame)
-        dict_frame.grid(row=12, column=0, columnspan=3, sticky=tk.W, padx=5)
+        dict_frame.grid(row=13, column=0, columnspan=3, sticky=tk.W, padx=5)
         ttk.Button(dict_frame, text="📝 Открыть словарь", command=self.open_stress_dict).pack(side=tk.LEFT, padx=5)
         ttk.Button(dict_frame, text="📄 Создать пример", command=self.create_example_dict).pack(side=tk.LEFT, padx=5)
         
         ttk.Checkbutton(settings_frame, text="Автосохранение настроек",
-                       variable=self.auto_save).grid(row=13, column=0, columnspan=2, sticky=tk.W, padx=5, pady=5)
+                       variable=self.auto_save).grid(row=14, column=0, columnspan=2, sticky=tk.W, padx=5, pady=5)
         
         # === Панель шагов обработки ===
         steps_frame = ttk.LabelFrame(main_frame, text="Этапы обработки", padding="10")
@@ -330,6 +335,14 @@ class MainWindow:
         
         ParamsDialog(self.root, self.config)
     
+    def open_split_params(self):
+        """Открыть окно настроек разбиения текста"""
+        if not self.work_dir.get():
+            messagebox.showerror("Ошибка", "Сначала выберите рабочую папку!")
+            return
+        
+        SplitParamsDialog(self.root, self.config)
+    
     def run_step1(self):
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Выберите рабочую папку!")
@@ -381,6 +394,7 @@ class MainWindow:
         threading.Thread(target=task, daemon=True).start()
     
     def run_step3(self):
+        """Запуск разбиения на фрагменты с параметрами из конфига"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Выберите рабочую папку!")
             return
@@ -390,8 +404,18 @@ class MainWindow:
                 self.status_var.set("Разбиение на фрагменты...")
                 self.progress.start()
                 
+                min_length = self.config.get("split_min_length", 50)
+                max_length = self.config.get("split_max_length", 300)
+                primary = self.config.get("split_primary_delimiters", ".!?")
+                secondary = self.config.get("split_secondary_delimiters", ":;,")
+                
+                self.log(f"Параметры разбиения: мин={min_length}, макс={max_length}")
+                self.log(f"  Главные разделители: {primary}")
+                self.log(f"  Второстепенные разделители: {secondary}")
+                self.log(f"  Алгоритм: разбиение → объединение коротких → разбиение длинных → восстановление по оригиналу → нормализация")
+                
                 processor = TextProcessor(self.work_dir.get())
-                results = processor.split_all()
+                results = processor.split_all(min_length, max_length, primary, secondary)
                 
                 total = sum(len(f) for f in results.values())
                 self.log(f"Разбито файлов: {len(results)}, фрагментов: {total}")
@@ -513,7 +537,16 @@ class MainWindow:
                 
                 # Этап 3
                 self.log("\n--- ЭТАП 3: Разбиение на фрагменты ---")
-                fragments = processor.split_all()
+                min_length = self.config.get("split_min_length", 50)
+                max_length = self.config.get("split_max_length", 300)
+                primary = self.config.get("split_primary_delimiters", ".!?")
+                secondary = self.config.get("split_secondary_delimiters", ":;,")
+                
+                self.log(f"  Параметры разбиения: мин={min_length}, макс={max_length}")
+                self.log(f"  Главные разделители: {primary}")
+                self.log(f"  Второстепенные разделители: {secondary}")
+                
+                fragments = processor.split_all(min_length, max_length, primary, secondary)
                 total = sum(len(f) for f in fragments.values())
                 self.log(f"Разбито файлов: {len(fragments)}, фрагментов: {total}")
                 
