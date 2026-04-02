@@ -27,6 +27,7 @@ class ConfigManager:
             "length_penalty": 1.0,
             "top_k": 50,
             "top_p": 0.85,
+            "num_beams": 1,
             "gpt_cond_len": 12,
             "sound_norm_refs": True,
             # Параметры разбиения текста

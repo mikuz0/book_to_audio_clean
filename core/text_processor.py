@@ -15,7 +15,6 @@ class TextProcessor:
         self.fragments_dir.mkdir(exist_ok=True)
         
         self.stress_dict = StressDictionary(work_dir)
-        self.original_text = ""
     
     def apply_replacements(self, text):
         """Применить исправления из словаря"""
@@ -195,9 +194,6 @@ class TextProcessor:
         if not text.strip():
             return None
         
-        # Сохраняем исходный текст для восстановления
-        self.original_text = text
-        
         text = self.apply_replacements(text)
         text = self.convert_to_unicode(text)
         
@@ -229,14 +225,11 @@ class TextProcessor:
         
         return results
     
-    def split_text(self, text, min_length=50, max_length=300, 
+    def split_text(self, text, original_text, min_length=50, max_length=300, 
                    primary_delimiters=".!?", secondary_delimiters=":;,"):
         """
         Разбить текст на фрагменты с восстановлением по исходному тексту
         """
-        # Сохраняем исходный текст для восстановления
-        original_text = text
-        
         # Шаг 2.1: Базовое разбиение по главным разделителям
         parts = []
         current = ""
@@ -318,7 +311,7 @@ class TextProcessor:
         
         return restored_parts
     
-    def split_file(self, input_file, min_length=50, max_length=300,
+    def split_file(self, input_file, original_text, min_length=50, max_length=300,
                    primary_delimiters=".!?", secondary_delimiters=":;,"):
         """Разбить файл на фрагменты с заданными параметрами"""
         input_file = Path(input_file)
@@ -329,7 +322,7 @@ class TextProcessor:
         if not text.strip():
             return []
         
-        fragments = self.split_text(text, min_length, max_length, 
+        fragments = self.split_text(text, original_text, min_length, max_length, 
                                      primary_delimiters, secondary_delimiters)
         
         output_dir = self.fragments_dir / input_file.stem
@@ -358,7 +351,17 @@ class TextProcessor:
         for f in files:
             print(f"\n--- {f.name} ---")
             try:
-                fragments = self.split_file(f, min_length, max_length,
+                # Загружаем оригинальный текст из extracted_dir для этого файла
+                extracted_file = self.extracted_dir / f.name.replace('_replaced', '_extracted')
+                if extracted_file.exists():
+                    with open(extracted_file, 'r', encoding='utf-8') as ef:
+                        original_text = ef.read()
+                else:
+                    # Если нет extracted файла, используем сам файл как оригинал
+                    original_text = None
+                    print(f"  Предупреждение: не найден оригинальный файл {extracted_file}")
+                
+                fragments = self.split_file(f, original_text, min_length, max_length,
                                            primary_delimiters, secondary_delimiters)
                 results[f.name] = fragments
                 print(f"  Разбито на {len(fragments)} фрагментов")

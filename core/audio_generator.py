@@ -21,6 +21,7 @@ class AudioGenerator:
                  length_penalty=1.0,
                  top_k=50,
                  top_p=0.85,
+                 num_beams=1,
                  gpt_cond_len=12,
                  sound_norm_refs=True):
         self.work_dir = Path(work_dir)
@@ -43,6 +44,7 @@ class AudioGenerator:
         self.length_penalty = length_penalty
         self.top_k = top_k
         self.top_p = top_p
+        self.num_beams = num_beams
         self.gpt_cond_len = gpt_cond_len
         self.sound_norm_refs = sound_norm_refs
         
@@ -62,6 +64,7 @@ class AudioGenerator:
         print(f"    length_penalty: {length_penalty}")
         print(f"    top_k: {top_k}")
         print(f"    top_p: {top_p}")
+        print(f"    num_beams: {num_beams}")
         print(f"    gpt_cond_len: {gpt_cond_len} сек")
         print(f"    sound_norm_refs: {sound_norm_refs}")
         
@@ -101,6 +104,7 @@ class AudioGenerator:
                 model.length_penalty = self.length_penalty
                 model.top_k = self.top_k
                 model.top_p = self.top_p
+                model.num_beams = self.num_beams
                 model.gpt_cond_len = self.gpt_cond_len
                 model.sound_norm_refs = self.sound_norm_refs
                 print("XTTS модель загружена с пользовательскими параметрами")
@@ -150,7 +154,15 @@ class AudioGenerator:
         tts_params = {
             'text': text,
             'language': 'ru',
-            'speed': self.speed
+            'speed': self.speed,
+            'temperature': self.temperature,
+            'repetition_penalty': self.repetition_penalty,
+            'length_penalty': self.length_penalty,
+            'top_k': self.top_k,
+            'top_p': self.top_p,
+            'num_beams': self.num_beams,
+            'gpt_cond_len': self.gpt_cond_len,
+            'sound_norm_refs': self.sound_norm_refs
         }
         
         if self.speaker_wav and os.path.exists(self.speaker_wav):

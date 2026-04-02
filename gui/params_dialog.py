@@ -10,14 +10,13 @@ class ParamsDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Параметры синтеза XTTS")
-        self.dialog.geometry("700x600")
-        self.dialog.minsize(600, 500)
+        self.dialog.geometry("700x650")
+        self.dialog.minsize(600, 550)
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
         
         self.value_vars = {}
-        self.sliders = {}
         
         self.setup_ui()
         self.load_values()
@@ -30,18 +29,14 @@ class ParamsDialog:
     
     def setup_ui(self):
         """Создание интерфейса окна"""
-        # Основной контейнер с возможностью растягивания
         main_frame = ttk.Frame(self.dialog, padding="15")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
-        # Настраиваем веса для растягивания
-        main_frame.columnconfigure(0, weight=1)
-        main_frame.columnconfigure(1, weight=2)
         
         # Пояснение
         info_label = ttk.Label(main_frame, 
             text="Настройка параметров синтеза речи.\n"
-                 "Увеличение repetition_penalty помогает бороться с хвостами и повторами.",
+                 "Увеличение repetition_penalty помогает бороться с хвостами и повторами.\n"
+                 "num_beams - количество лучей поиска (1 = быстро, больше = качественнее, но медленнее).",
             wraplength=650, justify=tk.LEFT)
         info_label.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 15))
         
@@ -63,61 +58,60 @@ class ParamsDialog:
                             "length_penalty", 0.5, 2.0, 0.05, 4, is_int=False,
                             tooltip="Положительные значения укорачивают фразы")
         
-        # Top K
+        # Top K (новый диапазон от 1)
         self._create_slider(main_frame, "Top K:", 
-                            "top_k", 10, 100, 5, 5, is_int=True,
-                            tooltip="Меньше = предсказуемее")
+                            "top_k", 1, 100, 1, 5, is_int=True,
+                            tooltip="Меньше = предсказуемее. Минимум 1.")
         
-        # Top P
+        # Top P (новый диапазон от 0.01)
         self._create_slider(main_frame, "Top P:", 
-                            "top_p", 0.5, 1.0, 0.05, 6, is_int=False,
-                            tooltip="Меньше = предсказуемее")
+                            "top_p", 0.01, 1.0, 0.01, 6, is_int=False,
+                            tooltip="Меньше = предсказуемее. Минимум 0.01.")
+        
+        # Num Beams (новый параметр)
+        self._create_slider(main_frame, "Num Beams (количество лучей):", 
+                            "num_beams", 1, 20, 1, 7, is_int=True,
+                            tooltip="Количество путей поиска. 1 = быстро, больше = качественнее, но медленнее.")
         
         # GPT cond len
         self._create_slider(main_frame, "GPT cond len (сек):", 
-                            "gpt_cond_len", 3, 30, 1, 7, is_int=True,
+                            "gpt_cond_len", 3, 30, 1, 8, is_int=True,
                             tooltip="Длина образца для клонирования голоса")
         
         # Разделитель
-        ttk.Separator(main_frame, orient='horizontal').grid(row=8, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         
         # Чекбокс для sound_norm_refs
-        ttk.Label(main_frame, text="Sound norm refs:").grid(row=9, column=0, sticky=tk.W, pady=10)
+        ttk.Label(main_frame, text="Sound norm refs:").grid(row=10, column=0, sticky=tk.W, pady=10)
         self.sound_norm_var = tk.BooleanVar()
         self.sound_norm_check = ttk.Checkbutton(main_frame, text="Авто-нормализация образца", 
                                                  variable=self.sound_norm_var)
-        self.sound_norm_check.grid(row=9, column=1, sticky=tk.W, pady=10)
+        self.sound_norm_check.grid(row=10, column=1, sticky=tk.W, pady=10)
         
         # Разделитель
-        ttk.Separator(main_frame, orient='horizontal').grid(row=10, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        ttk.Separator(main_frame, orient='horizontal').grid(row=11, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         
         # Кнопки
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.grid(row=11, column=0, columnspan=2, pady=15)
+        btn_frame.grid(row=12, column=0, columnspan=2, pady=15)
         
         ttk.Button(btn_frame, text="OK", command=self.on_ok).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Отмена", command=self.on_cancel).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Сбросить", command=self.on_reset).pack(side=tk.LEFT, padx=5)
     
     def _create_slider(self, parent, label, key, from_, to, step, row, is_int=False, tooltip=""):
-        """Создание ползунка с подписью и тултипом"""
-        # Метка
-        label_widget = ttk.Label(parent, text=label)
-        label_widget.grid(row=row, column=0, sticky=tk.W, pady=5)
-        
-        # Добавляем тултип если есть
-        if tooltip:
-            self._add_tooltip(label_widget, tooltip)
+        """Создание ползунка с подписью"""
+        ttk.Label(parent, text=label).grid(row=row, column=0, sticky=tk.W, pady=5)
         
         # Контейнер для слайдера и значения
         slider_frame = ttk.Frame(parent)
-        slider_frame.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=5, pady=5)
+        slider_frame.grid(row=row, column=1, sticky=tk.W, padx=5)
         slider_frame.columnconfigure(0, weight=1)
         
         self.value_vars[key] = tk.DoubleVar()
         
         slider = ttk.Scale(slider_frame, from_=from_, to=to, variable=self.value_vars[key],
-                           orient=tk.HORIZONTAL)
+                           orient=tk.HORIZONTAL, length=250)
         slider.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
         value_label = ttk.Label(slider_frame, text="", width=8)
@@ -133,7 +127,9 @@ class ParamsDialog:
         self.value_vars[key].trace_add("write", update_label)
         update_label()
         
-        self.sliders[key] = slider
+        # Тултип
+        if tooltip:
+            self._add_tooltip(slider, tooltip)
     
     def _add_tooltip(self, widget, text):
         """Добавить всплывающую подсказку"""
@@ -160,6 +156,7 @@ class ParamsDialog:
         self.value_vars["length_penalty"].set(self.config.get("length_penalty", 1.0))
         self.value_vars["top_k"].set(self.config.get("top_k", 50))
         self.value_vars["top_p"].set(self.config.get("top_p", 0.85))
+        self.value_vars["num_beams"].set(self.config.get("num_beams", 1))
         self.value_vars["gpt_cond_len"].set(self.config.get("gpt_cond_len", 12))
         self.sound_norm_var.set(self.config.get("sound_norm_refs", True))
     
@@ -170,6 +167,7 @@ class ParamsDialog:
         self.config.set("length_penalty", self.value_vars["length_penalty"].get())
         self.config.set("top_k", int(self.value_vars["top_k"].get()))
         self.config.set("top_p", self.value_vars["top_p"].get())
+        self.config.set("num_beams", int(self.value_vars["num_beams"].get()))
         self.config.set("gpt_cond_len", int(self.value_vars["gpt_cond_len"].get()))
         self.config.set("sound_norm_refs", self.sound_norm_var.get())
         
@@ -187,6 +185,7 @@ class ParamsDialog:
             "length_penalty": 1.0,
             "top_k": 50,
             "top_p": 0.85,
+            "num_beams": 1,
             "gpt_cond_len": 12,
             "sound_norm_refs": True
         }
@@ -196,5 +195,6 @@ class ParamsDialog:
         self.value_vars["length_penalty"].set(defaults["length_penalty"])
         self.value_vars["top_k"].set(defaults["top_k"])
         self.value_vars["top_p"].set(defaults["top_p"])
+        self.value_vars["num_beams"].set(defaults["num_beams"])
         self.value_vars["gpt_cond_len"].set(defaults["gpt_cond_len"])
         self.sound_norm_var.set(defaults["sound_norm_refs"])
