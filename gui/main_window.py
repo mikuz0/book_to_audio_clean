@@ -72,6 +72,7 @@ class MainWindow:
         self.root.protocol("WM_DELETE_WINDOW", self.on_closing)
     
     def _format_time(self, seconds):
+        """Форматирование времени в читаемый вид"""
         minutes = int(seconds // 60)
         secs = int(seconds % 60)
         if minutes > 0:
@@ -79,6 +80,7 @@ class MainWindow:
         return f"{secs} секунд"
     
     def check_source_folder(self):
+        """Проверка наличия папки source, создание при необходимости"""
         work_dir = self.work_dir.get()
         if work_dir and os.path.exists(work_dir):
             source_dir = Path(work_dir) / "source"
@@ -88,6 +90,7 @@ class MainWindow:
                 self.log("Поместите книги (PDF, EPUB, FB2, TXT) в эту папку")
     
     def setup_ui(self):
+        """Создание интерфейса"""
         main_frame = ttk.Frame(self.root, padding="10")
         main_frame.grid(row=0, column=0, sticky=(tk.W, tk.E, tk.N, tk.S))
         
@@ -325,6 +328,7 @@ class MainWindow:
             messagebox.showerror("Ошибка", f"Не удалось создать словарь: {e}")
     
     def open_synth_params(self):
+        """Открыть окно настроек параметров синтеза"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Сначала выберите рабочую папку!")
             return
@@ -332,6 +336,7 @@ class MainWindow:
         ParamsDialog(self.root, self.config)
     
     def open_split_params(self):
+        """Открыть окно настроек разбиения текста"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Сначала выберите рабочую папку!")
             return
@@ -389,6 +394,7 @@ class MainWindow:
         threading.Thread(target=task, daemon=True).start()
     
     def run_step3(self):
+        """Запуск разбиения на фрагменты с параметрами из конфига"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Выберите рабочую папку!")
             return
@@ -398,18 +404,20 @@ class MainWindow:
                 self.status_var.set("Разбиение на фрагменты...")
                 self.progress.start()
                 
-                min_length = self.config.get("split_min_length", 50)
-                max_length = self.config.get("split_max_length", 300)
+                min_length = self.config.get("split_min_length", 150)
+                max_length = self.config.get("split_max_length", 250)
                 primary = self.config.get("split_primary_delimiters", ".!?")
-                secondary = self.config.get("split_secondary_delimiters", ":;,")
+                secondary = self.config.get("split_secondary_delimiters", ":;")
+                terminator = self.config.get("split_terminator", ".")
                 
                 self.log(f"Параметры разбиения: мин={min_length}, макс={max_length}")
                 self.log(f"  Главные разделители: {primary}")
                 self.log(f"  Второстепенные разделители: {secondary}")
-                self.log(f"  Алгоритм: разбиение → объединение коротких → разбиение длинных → восстановление по оригиналу → нормализация")
+                self.log(f"  Символ завершения: '{terminator}'")
+                self.log(f"  Алгоритм: разбиение → объединение коротких → разбиение длинных → второе объединение → восстановление → нормализация")
                 
                 processor = TextProcessor(self.work_dir.get())
-                results = processor.split_all(min_length, max_length, primary, secondary)
+                results = processor.split_all(min_length, max_length, primary, secondary, terminator)
                 
                 total = sum(len(f) for f in results.values())
                 self.log(f"Разбито файлов: {len(results)}, фрагментов: {total}")
@@ -425,9 +433,11 @@ class MainWindow:
         threading.Thread(target=task, daemon=True).start()
     
     def _progress_callback(self, current, total, elapsed_str):
+        """Callback для обновления прогресса генерации"""
         self.log(f"создано {current} файлов из {total}. прошло времени с начала работы: {elapsed_str}")
     
     def run_step4(self):
+        """Запуск генерации аудио с субтитрами"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Выберите рабочую папку!")
             return
@@ -499,6 +509,7 @@ class MainWindow:
         threading.Thread(target=task, daemon=True).start()
     
     def run_all_steps(self):
+        """Выполнить все этапы последовательно"""
         if not self.work_dir.get():
             messagebox.showerror("Ошибка", "Выберите рабочую папку!")
             return
@@ -529,13 +540,18 @@ class MainWindow:
                 
                 # Этап 3
                 self.log("\n--- ЭТАП 3: Разбиение на фрагменты ---")
-                min_length = self.config.get("split_min_length", 50)
-                max_length = self.config.get("split_max_length", 300)
+                min_length = self.config.get("split_min_length", 150)
+                max_length = self.config.get("split_max_length", 250)
                 primary = self.config.get("split_primary_delimiters", ".!?")
-                secondary = self.config.get("split_secondary_delimiters", ":;,")
+                secondary = self.config.get("split_secondary_delimiters", ":;")
+                terminator = self.config.get("split_terminator", ".")
                 
                 self.log(f"  Параметры разбиения: мин={min_length}, макс={max_length}")
-                fragments = processor.split_all(min_length, max_length, primary, secondary)
+                self.log(f"  Главные разделители: {primary}")
+                self.log(f"  Второстепенные разделители: {secondary}")
+                self.log(f"  Символ завершения: '{terminator}'")
+                
+                fragments = processor.split_all(min_length, max_length, primary, secondary, terminator)
                 total = sum(len(f) for f in fragments.values())
                 self.log(f"Разбито файлов: {len(fragments)}, фрагментов: {total}")
                 

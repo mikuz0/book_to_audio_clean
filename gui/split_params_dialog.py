@@ -10,8 +10,8 @@ class SplitParamsDialog:
         
         self.dialog = tk.Toplevel(parent)
         self.dialog.title("Параметры разбиения текста")
-        self.dialog.geometry("650x600")
-        self.dialog.minsize(550, 500)
+        self.dialog.geometry("650x650")
+        self.dialog.minsize(550, 550)
         self.dialog.resizable(True, True)
         self.dialog.transient(parent)
         self.dialog.grab_set()
@@ -40,9 +40,9 @@ class SplitParamsDialog:
                  "1. Базовое разбиение по главным разделителям\n"
                  "2. Объединение коротких фрагментов до минимальной длины\n"
                  "3. Разбиение длинных фрагментов по второстепенным разделителям\n"
-                 "4. Восстановление знаков препинания по исходному тексту\n"
-                 "5. Корректировка конца (замена ,:; на точку, добавление точки)\n"
-                 "6. Корректировка начала (удаление .,:;..., заглавная буква)\n"
+                 "4. Объединение коротких фрагментов (второй проход)\n"
+                 "5. Восстановление знаков препинания по исходному тексту\n"
+                 "6. Добавление символа завершения в конец фрагмента\n"
                  "7. Нормализация пробелов",
             wraplength=580, justify=tk.LEFT)
         info_label.grid(row=0, column=0, columnspan=2, sticky=tk.W, pady=(0, 15))
@@ -75,10 +75,23 @@ class SplitParamsDialog:
         self.secondary_delimiters_var = tk.StringVar()
         secondary_entry = ttk.Entry(main_frame, textvariable=self.secondary_delimiters_var, width=30)
         secondary_entry.grid(row=7, column=1, sticky=tk.W, padx=5)
-        ttk.Label(main_frame, text="Пример: :;,", font=('TkDefaultFont', 8, 'italic')).grid(row=8, column=1, sticky=tk.W, padx=5)
+        ttk.Label(main_frame, text="Пример: :;", font=('TkDefaultFont', 8, 'italic')).grid(row=8, column=1, sticky=tk.W, padx=5)
         
         # Разделитель
         ttk.Separator(main_frame, orient='horizontal').grid(row=9, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
+        
+        # Символ завершения фрагмента
+        ttk.Label(main_frame, text="Символ завершения фрагмента:").grid(row=10, column=0, sticky=tk.W, pady=5)
+        self.terminator_var = tk.StringVar()
+        terminator_entry = ttk.Entry(main_frame, textvariable=self.terminator_var, width=10)
+        terminator_entry.grid(row=10, column=1, sticky=tk.W, padx=5)
+        ttk.Label(main_frame, text="Точка (.), восклицательный знак (!), вопросительный знак (?),\n"
+                                   "многоточие (...), пробел ( ) или оставить пустым.\n"
+                                   "Пустое поле = ничего не добавлять.",
+                  font=('TkDefaultFont', 8, 'italic'), wraplength=400).grid(row=11, column=0, columnspan=2, sticky=tk.W, padx=5)
+        
+        # Разделитель
+        ttk.Separator(main_frame, orient='horizontal').grid(row=12, column=0, columnspan=2, sticky=(tk.W, tk.E), pady=10)
         
         # Дополнительная информация
         info2_label = ttk.Label(main_frame, 
@@ -88,11 +101,11 @@ class SplitParamsDialog:
                  "• Первая буква фрагмента делается заглавной\n"
                  "• Кавычки и скобки сохраняются из исходного текста",
             wraplength=580, justify=tk.LEFT, font=('TkDefaultFont', 8, 'italic'))
-        info2_label.grid(row=10, column=0, columnspan=2, sticky=tk.W, pady=(5, 10))
+        info2_label.grid(row=13, column=0, columnspan=2, sticky=tk.W, pady=(5, 10))
         
         # Кнопки
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.grid(row=11, column=0, columnspan=2, pady=15)
+        btn_frame.grid(row=14, column=0, columnspan=2, pady=15)
         
         ttk.Button(btn_frame, text="OK", command=self.on_ok).pack(side=tk.LEFT, padx=5)
         ttk.Button(btn_frame, text="Отмена", command=self.on_cancel).pack(side=tk.LEFT, padx=5)
@@ -105,15 +118,16 @@ class SplitParamsDialog:
         # Контейнер для слайдера и значения
         slider_frame = ttk.Frame(parent)
         slider_frame.grid(row=row, column=1, sticky=tk.W, padx=5)
+        slider_frame.columnconfigure(0, weight=1)
         
         self.value_vars[key] = tk.DoubleVar()
         
         slider = ttk.Scale(slider_frame, from_=from_, to=to, variable=self.value_vars[key],
                            orient=tk.HORIZONTAL, length=200)
-        slider.pack(side=tk.LEFT)
+        slider.grid(row=0, column=0, sticky=(tk.W, tk.E))
         
         value_label = ttk.Label(slider_frame, text="", width=6)
-        value_label.pack(side=tk.LEFT, padx=10)
+        value_label.grid(row=0, column=1, padx=10)
         
         def update_label(*args):
             val = self.value_vars[key].get()
@@ -149,10 +163,11 @@ class SplitParamsDialog:
     
     def load_values(self):
         """Загрузить текущие значения из конфига"""
-        self.value_vars["split_min_length"].set(self.config.get("split_min_length", 50))
-        self.value_vars["split_max_length"].set(self.config.get("split_max_length", 300))
+        self.value_vars["split_min_length"].set(self.config.get("split_min_length", 150))
+        self.value_vars["split_max_length"].set(self.config.get("split_max_length", 250))
         self.primary_delimiters_var.set(self.config.get("split_primary_delimiters", ".!?"))
-        self.secondary_delimiters_var.set(self.config.get("split_secondary_delimiters", ":;,"))
+        self.secondary_delimiters_var.set(self.config.get("split_secondary_delimiters", ":;"))
+        self.terminator_var.set(self.config.get("split_terminator", "."))
     
     def on_ok(self):
         """Сохранение параметров и закрытие"""
@@ -160,6 +175,7 @@ class SplitParamsDialog:
         self.config.set("split_max_length", int(self.value_vars["split_max_length"].get()))
         self.config.set("split_primary_delimiters", self.primary_delimiters_var.get())
         self.config.set("split_secondary_delimiters", self.secondary_delimiters_var.get())
+        self.config.set("split_terminator", self.terminator_var.get())
         
         self.dialog.destroy()
     
@@ -169,7 +185,8 @@ class SplitParamsDialog:
     
     def on_reset(self):
         """Сброс значений по умолчанию"""
-        self.value_vars["split_min_length"].set(50)
-        self.value_vars["split_max_length"].set(300)
+        self.value_vars["split_min_length"].set(150)
+        self.value_vars["split_max_length"].set(250)
         self.primary_delimiters_var.set(".!?")
-        self.secondary_delimiters_var.set(":;,")
+        self.secondary_delimiters_var.set(":;")
+        self.terminator_var.set(".")

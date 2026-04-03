@@ -112,8 +112,11 @@ class TextProcessor:
         
         return None, -1, -1
     
-    def fix_fragment_end(self, text):
-        """Корректировка конца фрагмента"""
+    def fix_fragment_end(self, text, terminator="."):
+        """
+        Корректировка конца фрагмента.
+        terminator - символ завершения (может быть пустой строкой, пробелом, точкой и т.д.)
+        """
         if not text:
             return text
         
@@ -123,12 +126,33 @@ class TextProcessor:
         
         last_char = text[-1]
         
-        # Заменяем ; : , на точку в конце
+        # Заменяем ; : , на точку в конце (всегда)
         if last_char in ';:,':
             text = text[:-1] + '.'
-        # Если нет знака препинания в конце - добавляем точку
-        elif last_char not in '.!?':
-            text = text + '.'
+            last_char = '.'
+        
+        # Если terminator пустой - ничего не добавляем
+        if terminator == "":
+            return text
+        
+        # Если terminator - пробел
+        if terminator == " ":
+            if last_char not in '.!?':
+                text = text + ' '
+            return text
+        
+        # Если terminator - точка, восклицательный знак, вопросительный знак или другое
+        # Проверяем, заканчивается ли уже на terminator
+        if text.endswith(terminator):
+            return text
+        
+        # Проверяем, заканчивается ли на допустимый знак (.!?) и terminator не точка
+        if terminator != '.' and last_char in '.!?':
+            # Заменяем существующий знак на terminator
+            text = text[:-1] + terminator
+        else:
+            # Добавляем terminator в конец
+            text = text + terminator
         
         return text
     
@@ -153,7 +177,7 @@ class TextProcessor:
         
         return text
     
-    def restore_fragment(self, fragment, original_text):
+    def restore_fragment(self, fragment, original_text, terminator="."):
         """
         Восстанавливает фрагмент по исходному тексту:
         - Находит отрезок в исходном тексте
@@ -174,7 +198,7 @@ class TextProcessor:
             result = fragment
         
         # Корректировка конца
-        result = self.fix_fragment_end(result)
+        result = self.fix_fragment_end(result, terminator)
         
         # Корректировка начала
         result = self.fix_fragment_start(result)
@@ -183,6 +207,56 @@ class TextProcessor:
         result = self.normalize_spaces(result)
         
         return result
+    
+    def merge_short_fragments(self, fragments, min_length):
+        """
+        Объединяет короткие фрагменты с соседними.
+        Возвращает новый список фрагментов.
+        """
+        if not fragments:
+            return []
+        
+        merged = []
+        buffer = ""
+        
+        for frag in fragments:
+            if buffer:
+                buffer += " " + frag
+            else:
+                buffer = frag
+            
+            if len(buffer) >= min_length:
+                merged.append(buffer.strip())
+                buffer = ""
+        
+        # Обработка остатка
+        if buffer:
+            if merged and len(buffer) < min_length:
+                merged[-1] = merged[-1] + " " + buffer
+            else:
+                merged.append(buffer.strip())
+        
+        return merged
+    
+    def split_by_delimiters(self, text, delimiters):
+        """
+        Разбивает текст по указанным разделителям, сохраняя разделители в конце.
+        Возвращает список фрагментов.
+        """
+        parts = []
+        current = ""
+        
+        for ch in text:
+            current += ch
+            if ch in delimiters:
+                if current.strip():
+                    parts.append(current.strip())
+                current = ""
+        
+        if current.strip():
+            parts.append(current.strip())
+        
+        return parts
     
     def process_file(self, input_file):
         """Обработать файл: применить замены и конвертировать в Unicode"""
@@ -225,94 +299,57 @@ class TextProcessor:
         
         return results
     
-    def split_text(self, text, original_text, min_length=50, max_length=300, 
-                   primary_delimiters=".!?", secondary_delimiters=":;,"):
+    def split_text(self, text, original_text, min_length=150, max_length=250, 
+                   primary_delimiters=".!?", secondary_delimiters=":;", terminator="."):
         """
-        Разбить текст на фрагменты с восстановлением по исходному тексту
+        Разбить текст на фрагменты с восстановлением по исходному тексту.
+        
+        Алгоритм:
+        1. Разбиение по главным разделителям
+        2. Объединение коротких фрагментов (первый проход)
+        3. Разбиение длинных фрагментов по второстепенным разделителям
+        4. Объединение коротких фрагментов (второй проход)
+        5. Восстановление по оригиналу с добавлением terminator
+        6. Нормализация
         """
-        # Шаг 2.1: Базовое разбиение по главным разделителям
-        parts = []
-        current = ""
+        # Шаг 1: Разбиение по главным разделителям
+        parts = self.split_by_delimiters(text, primary_delimiters)
         
-        for ch in text:
-            current += ch
-            if ch in primary_delimiters:
-                if current.strip():
-                    parts.append(current.strip())
-                current = ""
-        if current.strip():
-            parts.append(current.strip())
+        # Шаг 2: Объединение коротких фрагментов (первый проход)
+        merged = self.merge_short_fragments(parts, min_length)
         
-        # Шаг 2.2: Объединение коротких фрагментов
-        merged = []
-        buffer = ""
-        
-        for part in parts:
-            if buffer:
-                buffer += " " + part
-            else:
-                buffer = part
-            
-            if len(buffer) >= min_length:
-                merged.append(buffer.strip())
-                buffer = ""
-        
-        # Обработка остатка (последний фрагмент)
-        if buffer:
-            if merged and len(buffer) < min_length:
-                merged[-1] = merged[-1] + " " + buffer
-            else:
-                merged.append(buffer.strip())
-        
-        # Шаг 2.3: Разбиение длинных фрагментов
+        # Шаг 3: Разбиение длинных фрагментов по второстепенным разделителям
         final_parts = []
-        
         for part in merged:
             if len(part) <= max_length:
                 final_parts.append(part)
-                continue
-            
-            # Разбиваем по второстепенным разделителям
-            sub_parts = []
-            sub_current = ""
-            
-            for ch in part:
-                sub_current += ch
-                if ch in secondary_delimiters:
-                    if sub_current.strip():
-                        sub_parts.append(sub_current.strip())
-                    sub_current = ""
-            
-            if sub_current.strip():
-                sub_parts.append(sub_current.strip())
-            
-            if len(sub_parts) == 1:
-                # Если не удалось разбить - принудительное разбиение
-                for i in range(0, len(part), max_length):
-                    chunk = part[i:i+max_length]
-                    if chunk:
-                        final_parts.append(chunk.strip())
             else:
-                for sub in sub_parts:
-                    if len(sub) > max_length:
-                        for i in range(0, len(sub), max_length):
-                            chunk = sub[i:i+max_length]
-                            if chunk:
-                                final_parts.append(chunk.strip())
-                    else:
-                        final_parts.append(sub)
+                # Разбиваем длинный фрагмент
+                sub_parts = self.split_by_delimiters(part, secondary_delimiters)
+                
+                if len(sub_parts) == 1:
+                    # Если не удалось разбить - принудительное разбиение по длине
+                    for i in range(0, len(part), max_length):
+                        chunk = part[i:i+max_length]
+                        if chunk:
+                            final_parts.append(chunk.strip())
+                else:
+                    final_parts.extend(sub_parts)
         
-        # Шаг 3: Восстановление по исходному тексту
+        # Шаг 4: Объединение коротких фрагментов (второй проход)
+        merged_again = self.merge_short_fragments(final_parts, min_length)
+        
+        # Шаг 5: Восстановление по исходному тексту с добавлением terminator
         restored_parts = []
-        for part in final_parts:
-            restored = self.restore_fragment(part, original_text)
+        for part in merged_again:
+            restored = self.restore_fragment(part, original_text, terminator)
             if restored:
                 restored_parts.append(restored)
         
         return restored_parts
     
-    def split_file(self, input_file, original_text, min_length=50, max_length=300,
-                   primary_delimiters=".!?", secondary_delimiters=":;,"):
+    def split_file(self, input_file, original_text, min_length=150, max_length=250,
+                   primary_delimiters=".!?", secondary_delimiters=":;", terminator="."):
         """Разбить файл на фрагменты с заданными параметрами"""
         input_file = Path(input_file)
         
@@ -323,7 +360,7 @@ class TextProcessor:
             return []
         
         fragments = self.split_text(text, original_text, min_length, max_length, 
-                                     primary_delimiters, secondary_delimiters)
+                                     primary_delimiters, secondary_delimiters, terminator)
         
         output_dir = self.fragments_dir / input_file.stem
         output_dir.mkdir(exist_ok=True)
@@ -337,8 +374,8 @@ class TextProcessor:
         
         return saved_files
     
-    def split_all(self, min_length=50, max_length=300,
-                  primary_delimiters=".!?", secondary_delimiters=":;,"):
+    def split_all(self, min_length=150, max_length=250,
+                  primary_delimiters=".!?", secondary_delimiters=":;", terminator="."):
         """Разбить все обработанные файлы на фрагменты"""
         if not self.replaced_dir.exists():
             print(f"Папка {self.replaced_dir} не найдена")
@@ -357,12 +394,11 @@ class TextProcessor:
                     with open(extracted_file, 'r', encoding='utf-8') as ef:
                         original_text = ef.read()
                 else:
-                    # Если нет extracted файла, используем сам файл как оригинал
                     original_text = None
                     print(f"  Предупреждение: не найден оригинальный файл {extracted_file}")
                 
                 fragments = self.split_file(f, original_text, min_length, max_length,
-                                           primary_delimiters, secondary_delimiters)
+                                           primary_delimiters, secondary_delimiters, terminator)
                 results[f.name] = fragments
                 print(f"  Разбито на {len(fragments)} фрагментов")
                 if fragments:

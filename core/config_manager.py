@@ -31,10 +31,11 @@ class ConfigManager:
             "gpt_cond_len": 12,
             "sound_norm_refs": True,
             # Параметры разбиения текста
-            "split_min_length": 50,
-            "split_max_length": 300,
+            "split_min_length": 150,
+            "split_max_length": 250,
             "split_primary_delimiters": ".!?",
-            "split_secondary_delimiters": ":;,"
+            "split_secondary_delimiters": ":;",
+            "split_terminator": "."      # Символ завершения фрагмента
         }
         self.load()
     

@@ -242,3 +242,6 @@ sudo apt install ffmpeg
 Автор: mikuz
 Версия: 2.0 (XTTS + субтитры)
 Дата: март 2026
+
+https://mkuznecov.ru/
+
